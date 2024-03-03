@@ -1,0 +1,6 @@
+*.diff
+*.o
+*.out
+*.bin
+*.map
+bochs/*

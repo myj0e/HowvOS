@@ -214,3 +214,26 @@ put_int:
   jl .put_each_num
   popad
   ret
+
+
+global set_cursor
+set_cursor:
+  pushad
+  mov bx, [esp+36]
+;;;;;;;; 先设置高8位 ;;;;;;;;
+  mov dx, 0x03d4
+  mov al, 0x0e
+  out dx, al
+  mov dx, 0x03d5
+  mov al, bh
+  out dx, al
+
+;;;;;;;; 再设置低8位 ;;;;;;;;
+  mov dx, 0x03d4
+  mov al, 0x0f
+  out dx, al
+  mov dx, 0x03d5
+  mov al, bl
+  out dx, al
+  popad
+  ret

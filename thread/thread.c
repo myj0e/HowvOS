@@ -129,6 +129,36 @@ void schedule(){
   switch_to(cur, next);
 }
 
+void thread_block(enum task_status stat){
+  //只有当以下三种状态时才会发生阻塞
+  ASSERT(((stat == TASK_BLOCKED) || (stat == TASK_WAITING) || (stat == TASK_HANGING)));
+  enum intr_status old_status = intr_disable(); //关闭中断
+  struct task_struct* cur_thread = running_thread(); // 获取当前进程PCB
+  cur_thread->status = stat; //设置该进程的状态为开始检查的三种状态之一
+  schedule(); //开始调度
+  intr_set_status(old_status);//恢复原中断状态
+}
+
+
+void thread_unblock(struct task_struct* pthread){
+  //只有当以下三种状态时才会发生阻塞
+  ASSERT(((pthread->status == TASK_BLOCKED) || \ 
+  (pthread->status == TASK_WAITING) || (pthread->status == TASK_HANGING)));
+  enum intr_status old_status = intr_disable(); //关闭中断
+  if(pthread->status != TASK_READY){
+    ASSERT(!elem_find(&thread_ready_list, &pthread->general_tag))
+    if(elem_find(&thread_ready_list, &pthread->general_tag)) //ASSERT在前，应该不会执行到这里
+    {
+      PANIC("thread_unblock: bolcked thread in ready_list\n");
+    }
+    list_push(&thread_ready_list, &pthread->general_tag); //放到队头，使快速执行
+    pthread->status = TASK_READY; //设置该进程的状态为就绪状态
+  }
+  
+
+  intr_set_status(old_status);//恢复原中断状态
+}
+
 /* 初始化线程环境 */
 void thread_init(void){
   put_str("thread_init start\n");

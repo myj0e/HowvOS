@@ -2,8 +2,9 @@
 #include "stdint.h"
 #include "global.h"
 #include "io.h"
+#include "print.h"
 
-#define IDT_DESC_CNT 0x21           //目前总支持的中断数
+#define IDT_DESC_CNT 0x30           //目前总支持的中断数
 #define PIC_M_CTRL 0x20             //主片控制端口
 #define PIC_M_DATA 0x21             //主片数据端口
 #define PIC_S_CTRL 0xA0             //从片控制端口
@@ -43,7 +44,7 @@ static void pic_init(void){
   outb(PIC_S_DATA, 0x01);           //ICW4:同上
 
   /* 打开主片上的IR0,也就是目前只接受时钟产生的中断 */
-  outb(PIC_M_DATA, 0xfe);           //OCW1:IRQ0外全部屏蔽
+  outb(PIC_M_DATA, 0xfc);           //OCW1:IRQ0时钟和IRQ1键盘外全部屏蔽
   outb(PIC_S_DATA, 0xff);           //OCW1:IRQ8~15全部屏蔽
 
   put_str("     pic init done!\n");
@@ -73,9 +74,25 @@ static void general_intr_handler(uint64_t vec_nr){
   if(vec_nr == 0x27 || vec_nr == 0x2f){
     return;
   } 
-  put_str("int vector : 0x");       //这里我们仅实现一个打印中断数的功能
-  put_int(vec_nr);
-  put_char('\n');
+  /* 将光标置为0,从屏幕左上角清出一片打印异常信息的区域方便阅读 */
+  set_cursor(0);    //这里是print.S中的设置光标函数，光标值范围是0～1999
+  int cursor_pos = 0;
+  while(cursor_pos < 320){
+    put_char(' ');
+    cursor_pos++;
+  }
+  set_cursor(0);    //重置光标值
+  put_str("!!!!!!!!  exception message begin  !!!!!!!!");
+  set_cursor(88);    //从第二行第8个字符开始打印
+  put_str(intr_name[vec_nr]);
+  if(vec_nr == 14){         //若为PageFault,将缺失的地址打印出来并悬停
+    int page_fault_vaddr = 0;
+    asm("movl %%cr2, %0" : "=r"(page_fault_vaddr));     //cr2存放造成PageFault的地址
+    put_str("\npage fault addr is ");
+  }
+  put_str("\n!!!!!!!!   exception message end !!!!!!!");
+  /* 能进入中断处理程序就表示已经在关中断情况下了，不会出现调度进程的情况，因此下面的死循环不会被中断 */
+  while(1);
 }
 
 /* 完成一般中断处理函数注册以及异常名称注册 */
@@ -127,7 +144,7 @@ enum intr_status intr_enable(){
 enum intr_status intr_disable(){
   enum intr_status old_status;
   if(INTR_ON == intr_get_status()){
-    old_status = INTR_OFF;
+    old_status = INTR_ON;
     asm volatile("cli" : : : "memory");
     return old_status;
   }else{
@@ -146,6 +163,12 @@ enum intr_status intr_get_status(){
   uint32_t eflags = 0;
   GET_EFLAGS(eflags);
   return (EFLAGS_IF & eflags) ? INTR_ON : INTR_OFF ; 
+}
+
+/* 在中断处理程序数组第vector_no个元素中注册安装中断处理程序function */
+void register_handler(uint8_t vector_no, intr_handler function){
+  /* idt_table数组中的函数是在进入中断后根据中断向量号调用的 */
+  idt_table[vector_no] = function;
 }
 
 /*完成有关中断的所有初始化工作*/

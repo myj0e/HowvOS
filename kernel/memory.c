@@ -52,7 +52,7 @@ static void* vaddr_get(enum pool_flags pf, uint32_t pg_cnt){
 }
 
 /* 得到虚拟地址vaddr对应的pte指针 */
-uint32_t* pte_ptr(uint32_t vaddr){
+static uint32_t* pte_ptr(uint32_t vaddr){
   /*先访问到页表自己，然后用页目录项pde作为pte的索引访问到页表，
    * 在用pte的索引作为页内偏移
    * */
@@ -61,7 +61,7 @@ uint32_t* pte_ptr(uint32_t vaddr){
 }
 
 /* 得到虚拟地址vaddr对应的pde的指针 */
-uint32_t* pde_ptr(uint32_t vaddr){
+static uint32_t* pde_ptr(uint32_t vaddr){
   uint32_t* pde = (uint32_t*)((0xfffff000) + PDE_IDX(vaddr)*4);
   return pde;
 }

@@ -82,13 +82,14 @@ static void general_intr_handler(uint64_t vec_nr){
     cursor_pos++;
   }
   set_cursor(0);    //重置光标值
-  put_str("!!!!!!!!  exception message begin  !!!!!!!!");
+  put_str("!!!!!!!!  exception message begin  !!!!!!!!\n");
   set_cursor(88);    //从第二行第8个字符开始打印
   put_str(intr_name[vec_nr]);
   if(vec_nr == 14){         //若为PageFault,将缺失的地址打印出来并悬停
     int page_fault_vaddr = 0;
     asm("movl %%cr2, %0" : "=r"(page_fault_vaddr));     //cr2存放造成PageFault的地址
     put_str("\npage fault addr is ");
+    put_int(page_fault_vaddr);
   }
   put_str("\n!!!!!!!!   exception message end !!!!!!!");
   /* 能进入中断处理程序就表示已经在关中断情况下了，不会出现调度进程的情况，因此下面的死循环不会被中断 */
@@ -124,7 +125,6 @@ static void exception_init(void){
   intr_name[17] = "#AC Alignment Check Exception";
   intr_name[18] = "#MC Machine-Check Exception";
   intr_name[19] = "#XF SIMD Floating-Point Exception";
-  put_str("     exception init done \n");
 }
 
 /* 开中断并返回开中断前的状态 */
@@ -179,7 +179,7 @@ void idt_init(){
   pic_init();               //初始化8259A
 
   /* 加载idt */
-  uint64_t idt_operand = (sizeof(idt)-1) | ((uint64_t)((uint32_t)idt << 16));   //这里(sizeof(idt)-1)是表示段界限，占16位，然后我们的idt地址左移16位表示高32位，表示idt首地址
+  uint64_t idt_operand = ((sizeof(idt)-1) | ((uint64_t)(uint32_t)idt << 16));   //这里(sizeof(idt)-1)是表示段界限，占16位，然后我们的idt地址左移16位表示高32位，表示idt首地址
   asm volatile("lidt %0" : : "m" (idt_operand)); 
   put_str("idt_init done\n");
 }

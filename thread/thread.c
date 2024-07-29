@@ -7,8 +7,7 @@
 #include "interrupt.h"
 #include "debug.h"
 #include "print.h"
-
-#define PG_SIZE 4096
+#include "process.h"
 
 extern void *intr_exit;
 
@@ -48,7 +47,7 @@ void thread_create(struct task_struct* pthread, thread_func function, void* func
   kthread_stack->function = function;
   kthread_stack->func_arg = func_arg;
   kthread_stack->ebp = kthread_stack->ebx = kthread_stack->esi = kthread_stack->edi = 0;
-}-=
+}
 
 /* 初始化线程基本信息 */
 void init_thread(struct task_struct* pthread, char* name, int prio){
@@ -126,6 +125,10 @@ void schedule(){
   thread_tag = list_pop(&thread_ready_list);
   struct task_struct* next = elem2entry(struct task_struct, general_tag, thread_tag);
   next->status = TASK_RUNNING;
+
+    /* 激活任务页表等 */
+  process_activate(next);
+
   switch_to(cur, next);
 }
 
@@ -142,7 +145,7 @@ void thread_block(enum task_status stat){
 
 void thread_unblock(struct task_struct* pthread){
   //只有当以下三种状态时才会发生阻塞
-  ASSERT(((pthread->status == TASK_BLOCKED) || \ 
+  ASSERT(((pthread->status == TASK_BLOCKED) || \
   (pthread->status == TASK_WAITING) || (pthread->status == TASK_HANGING)));
   enum intr_status old_status = intr_disable(); //关闭中断
   if(pthread->status != TASK_READY){

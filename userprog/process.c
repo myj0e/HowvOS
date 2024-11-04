@@ -13,8 +13,8 @@
 extern void intr_exit(void);    //kernel.S中的中断返回函数
 
 /* 构建用户进程初始上下文信息,伪造中断返回的假象 */
-void start_process(void* filename_){
-  void* function = filename_;
+void start_process(void* filename){
+  void* function = filename;
   struct task_struct* cur = running_thread();
   cur->self_kstack += sizeof(struct thread_stack);      //使得其指向中断栈
   struct intr_stack* proc_stack = (struct intr_stack*)cur->self_kstack;
@@ -97,6 +97,7 @@ void process_execute(void* filename, char* name){
   create_user_vaddr_bitmap(thread);                             //构建位图，并且写入咱们的PCB
   thread_create(thread, start_process, filename);               //这里预留出中断栈和线程栈，然后将还原后的eip指针指向start_process(filename);
   thread->pgdir = create_page_dir();                            //新建用户页目录并且返回页目录首地址
+  block_desc_init(thread->u_block_desc);
 
   enum intr_status old_status = intr_disable();
   ASSERT(!elem_find(&thread_ready_list, &thread->general_tag));

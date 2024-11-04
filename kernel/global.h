@@ -118,6 +118,7 @@ struct gdt_desc {
 
 #define NULL ((void*)0)
 #define DIV_ROUND_UP(X, STEP) ((X + STEP - 1) / (STEP))
+#define UNUSED __attribute__((unused))
 #define bool int
 #define true 1
 #define false 0

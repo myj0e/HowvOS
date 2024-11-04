@@ -53,8 +53,6 @@ static struct gdt_desc make_gdt_desc(uint32_t* desc_addr, uint32_t limit, uint8_
   return desc;
 }
 
-/* TODO: insert gde function.*/
-
 /* 在gdt中创建tss并重新加载gdt */
 void tss_init(){
   put_str("tss_init start\n");

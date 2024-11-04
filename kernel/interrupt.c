@@ -4,7 +4,7 @@
 #include "io.h"
 #include "print.h"
 
-#define IDT_DESC_CNT 0x30           //目前总支持的中断数
+#define IDT_DESC_CNT 0x81           //目前总支持的中断数
 #define PIC_M_CTRL 0x20             //主片控制端口
 #define PIC_M_DATA 0x21             //主片数据端口
 #define PIC_S_CTRL 0xA0             //从片控制端口
@@ -26,8 +26,13 @@ static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler 
 static struct gate_desc idt[IDT_DESC_CNT];  //idt是中断描述符表，本质上是中断描述符数组
 
 char* intr_name[IDT_DESC_CNT];              //用于保存异常的名字，这里感觉很像ELF文件的结构了
+
+
+
 intr_handler idt_table[IDT_DESC_CNT];       //定义中断处理程序地址数组
+
 extern intr_handler intr_entry_table[IDT_DESC_CNT];     //声明引用在kernel.S中的中断处理函数入口数组
+extern uint32_t syscall_handler(void);      //单独的系统调用中断处理函数例程
 
 /* 初始化可编程中断控制器 */
 static void pic_init(void){
@@ -43,11 +48,11 @@ static void pic_init(void){
   outb(PIC_S_DATA, 0x02);           //ICW3:设置从片连接到主片的IR2引脚
   outb(PIC_S_DATA, 0x01);           //ICW4:同上
 
-  /* 打开主片上的IR0,也就是目前只接受时钟产生的中断 */
-  outb(PIC_M_DATA, 0xfc);           //OCW1:IRQ0时钟和IRQ1键盘外全部屏蔽
-  outb(PIC_S_DATA, 0xff);           //OCW1:IRQ8~15全部屏蔽
+  /* 打开主片上的IR0,也就是目前只接受时钟产生的中断与键盘中断 */
+  outb(PIC_M_DATA, 0xf8);           //OCW1:IRQ0时钟和IRQ1键盘 IRQ2级联从片外全部屏蔽,
+  outb(PIC_S_DATA, 0xbf);           //OCW1:从片IRQ8~15，打开IRQ14硬盘中断，其余全部屏蔽
 
-  put_str("     pic init done!\n");
+  put_str("pic init done!\n");
 }
 
 /*创建中断门描述符*/
@@ -61,15 +66,19 @@ static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler 
 
 /*初始化中断描述符表*/
 static void idt_desc_init(void){
-  int i;
+  int i, lastindex = IDT_DESC_CNT-1;
   for(i = 0;i < IDT_DESC_CNT; i++){
     make_idt_desc(&idt[i],IDT_DESC_ATTR_DPL0, intr_entry_table[i]);
   }
+  
+  /* 单独处理系统调用，因为这里要使得用户能直接使用，所以系统调用对应的中断门dpl应为3,
+   * 中断处理程序为单独的syscall_handler*/
+  make_idt_desc(&idt[lastindex], IDT_DESC_ATTR_DPL3, syscall_handler);
   put_str("idt_desc_init_done!\n");
 }
 
 /* 通用的中断处理函数，一般用在出现异常的时候处理 */
-static void general_intr_handler(uint64_t vec_nr){
+static void general_intr_handler(uint8_t vec_nr){
   /* IRQ7和IRQ15会产生伪中断，IRQ15是从片上最后一个引脚，保留项，这俩都不需要处理 */
   if(vec_nr == 0x27 || vec_nr == 0x2f){
     return;

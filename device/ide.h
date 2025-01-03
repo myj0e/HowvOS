@@ -38,6 +38,11 @@ struct ide_channel{
   struct disk devices[2];       //一个通道上的主从两个硬盘
 };
 
+/* 以下内容是 硬盘设备控制相关 暴露出来给fs初始化使用 */
+extern uint8_t channel_cnt;    //通道数
+extern struct ide_channel channels[2];  //两个通道
+extern struct list partition_list;    //分区队列
+
 void ide_init(void);
 void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt);
 void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt);

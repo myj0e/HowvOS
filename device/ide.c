@@ -9,6 +9,8 @@
 #include "list.h"
 #include "memory.h"
 #include "global.h"
+#include "timer.h"
+#include "string.h"
 
 /* 定义硬盘各寄存器的端口号 */
 #define reg_data(channel)   (channel->port_base + 0)
@@ -142,6 +144,18 @@ static bool busy_wait(struct disk* hd){
 }
 
 /* 从硬盘读取sec_cnt个山区到buf */
+/**
+ * @brief 从指定的硬盘读取数据到内存缓冲区。
+ * 
+ * 此函数用于从指定的逻辑块地址（LBA）开始，读取一定数量的扇区数据到提供的缓冲区中。
+ * 在读取过程中，会根据硬件限制分批次读取，确保每次读取不超过256个扇区。
+ * 读取操作是通过IDE通道进行的，并且在读取过程中会阻塞当前线程，直到读取完成或发生错误。
+ * 
+ * @param hd 指向disk结构的指针，表示要操作的硬盘设备
+ * @param lba 起始逻辑块地址（LBA），表示读取起始位置
+ * @param buf 指向目标缓冲区的指针，用于存储读取的数据
+ * @param sec_cnt 要读取的扇区数量
+ */
 void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt){
   ASSERT(lba <= max_lba);
   ASSERT(sec_cnt > 0);
@@ -185,7 +199,24 @@ void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt){
   lock_release(&hd->my_channel->lock);
 }
 
-/* 将buf中sec_cnt扇区数据写入硬盘 */
+/* 将buf中sec_cnt扇区数据写入硬盘
+ *
+ * @brief 将指定数量的扇区数据从内存写入硬盘。
+ *
+ * 该函数负责将缓冲区中的数据写入到指定逻辑块地址（LBA）处的硬盘扇区。它会根据需要分批写入最多256个扇区，
+ * 并确保每次写操作完成后硬盘处于正确状态。具体步骤包括：
+ * 1. 选择要操作的硬盘；
+ * 2. 设置待写入的扇区数和起始扇区号；
+ * 3. 发送写命令到硬盘；
+ * 4. 等待硬盘准备好并执行写操作；
+ * 5. 检查硬盘状态，确保写操作成功；
+ * 6. 阻塞当前线程直到硬盘完成写操作。
+ *
+ * @param hd 指向硬盘结构体的指针，包含硬盘的相关信息。
+ * @param lba 起始逻辑块地址（LBA），表示从哪个扇区开始写入。
+ * @param buf 指向内存中数据缓冲区的指针，包含要写入的数据。
+ * @param sec_cnt 要写入的扇区数量。
+ */
 void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt){
   ASSERT(lba <= max_lba);
   ASSERT(sec_cnt > 0);
@@ -227,7 +258,7 @@ void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt){
 }
 
 /* 硬盘中断程序 */
-void intr_hd_handler(uint8_t irq_no){
+static void intr_hd_handler(uint8_t irq_no){
   ASSERT(irq_no == 0x2e || irq_no == 0x2f);
   uint8_t ch_no = irq_no - 0x2e;    //查看是哪个通道
   struct ide_channel* channel = &channels[ch_no];
@@ -339,7 +370,7 @@ void ide_init(){
   list_init(&partition_list);
   channel_cnt = DIV_ROUND_UP(hd_cnt, 2);    //一个通道有两个硬盘，这里我们通过硬盘数量反推通道数
   struct ide_channel* channel;
-  uint8_t channel_no, dev_no = 0;
+  uint8_t channel_no=0, dev_no = 0;
 
   /* 处理每个通道上的硬盘 */
   while(channel_no < channel_cnt){

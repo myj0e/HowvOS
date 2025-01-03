@@ -3,6 +3,19 @@
 #include "global.h"
 #include "stdint.h"
 #define offset(struct_type, member) (int)(&((struct_type*)0)->member)
+
+/**
+ * @brief 通过元素指针获取包含该元素的结构体指针。
+ *
+ * 该宏用于从一个结构体成员（元素）的指针反推出整个结构体的指针。它通过计算成员在结构体中的偏移量，
+ * 并将元素指针减去该偏移量，从而得到结构体的起始地址。
+ *
+ * @param struct_type 结构体类型名称。
+ * @param struct_member_name 结构体成员的名称。
+ * @param elem_ptr 指向结构体成员的指针。
+ *
+ * @return 返回指向包含该成员的结构体的指针。
+ */
 #define elem2entry(struct_type, struct_member_name, elem_ptr) (struct_type*)((int)elem_ptr - offset(struct_type, struct_member_name))
 
 /********** 定义链表结点成员结构 **********
